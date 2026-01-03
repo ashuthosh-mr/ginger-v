@@ -1,0 +1,3 @@
+[submodule "redmule"]
+	path = redmule
+	url = git@github.com:ashuthosh-mr/redmule.git
