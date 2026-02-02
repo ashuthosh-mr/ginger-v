@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/paragatolabs.png" width="420"><br>
+  <img src="assets/paragatolabs.png" width="100%">
   <em>ParaGato Labs · Edge genomics on RISC-V</em>
 </p>
 
