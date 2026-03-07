@@ -94,7 +94,7 @@ Hierarchy interpretation:
 
 ### Floorplan / Placement
 
-![RedMulE standalone on ZCU104's FPGA device](assets/redmule_place.png)
+![RedMulE standalone on ZCU104's FPGA device](../assets/redmule_place.png)
 
 
 ---
