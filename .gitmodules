@@ -1,3 +1,6 @@
 [submodule "redmule"]
 	path = redmule
 	url = git@github.com:ashuthosh-mr/redmule.git
+[submodule "Deeploy"]
+	path = Deeploy
+	url = https://github.com/pulp-platform/Deeploy.git
