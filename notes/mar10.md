@@ -1,5 +1,3 @@
----
-
 # Deeploy Integration Notes
 
 **Date:** March 10 2026
