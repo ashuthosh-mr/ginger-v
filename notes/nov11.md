@@ -70,3 +70,84 @@ python3 testRunner_tiled_siracusa_w_redmule.py -t Tests/miniBasecaller --cores=8
 - The off-chip ("doesn't fit") experiment: shrink L2 / widen tensors so data
   spills to L3/HyperRAM; measure off-chip traffic.
 See [[nov9]] (env) and [[nov10]] (CPU-vs-RedMulE kernel data).
+
+---
+
+## New research idea — the "specialization roofline" (fine vs coarse)
+
+A framing that unifies **mouna** (fine-grained specialization: custom ISA
+instructions, in-core, no DMA, validated cycle model) with **ginger-v**
+(coarse-grained specialization: an accelerator reached over DMA). Core question:
+
+> Given a workload kernel, when is it better to specialize via an **ISA
+> extension** vs via an **accelerator**? Can a validated model predict the
+> winner *before* building either?
+
+### The model (overhead-aware roofline)
+Write the accelerator's time for a kernel as three terms:
+
+```
+time_acc  =  σ    +   D/β      +   W/r_acc
+           setup     move data     compute
+```
+- σ = fixed offload/DMA setup cost
+- D = bytes that must move, β = DMA bandwidth
+- W = work (ops), r_acc = accelerator peak throughput
+
+The custom instruction moves nothing: `time_ci = W / r_ci`.
+
+### Crossover (closed form)
+Set the two equal and solve for the break-even work:
+
+```
+          σ + D/β
+W*  =  ───────────────
+        1/r_ci − 1/r_acc
+```
+
+In English: the accelerator must do enough work W* to **amortize its overhead
+(σ + D/β)**, divided by how much faster it is per op. **Below W*, the custom
+instruction wins.** Simple enough to hold in your head; the actual W* for a given
+kernel is not guessable — it needs the validated model to supply σ, β, r_ci,
+r_acc.
+
+Substituting intensity I = W/D splits it into two knobs:
+```
+1/r_ci  =  σ/W   +   1/(I·β)   +   1/r_acc
+          size       intensity     peak
+          penalty    penalty
+```
+→ a **size threshold** (σ/W term: tiny kernels favor custom insns) and an
+**intensity threshold** (1/(Iβ) term: low-reuse kernels favor custom insns).
+Two counterintuitive, testable predictions.
+
+### The "ideal roofline" as the reference frame
+Take the ideal limit: σ=0, β→∞, r_acc→∞. Every accelerator term vanishes — the
+accelerator is free and instant, so it **always wins**. That is exactly the
+assumption the field quietly makes ("you built the accelerator, so use it").
+**Reality departs from the ideal by precisely σ, D/β, and finite r_acc — and
+that departure opens the regime where the small, fine-grained option wins.** The
+contribution is measuring the gap to ideal and showing it's decision-changing.
+
+### Why it's more than textbook roofline
+1. **Overhead term.** Classic roofline only draws ceilings; it ignores σ/setup,
+   which is *the* thing governing the fine/coarse boundary.
+2. **Predictive, not descriptive.** Says which hardware to build *before* either
+   exists — mouna validates the custom-insn line, ginger-v the accelerator line.
+3. **Surprising claim.** "Smaller/cheaper specialization has a real winning
+   regime" cuts against reflex. Simple + surprising + validated.
+
+### Ties to data already collected
+The nov10 crossover (DMA is a fixed tax RedMulE can't reduce → offload not worth
+it below some size) is exactly this decision boundary, measured. The specialization
+roofline is the general frame that observation is a single point on.
+
+### Open threads
+- Double-buffered variant: compute and DMA overlap → `time_acc = σ + max(D/β,
+  W/r_acc)`. Changes the crossover; worth deriving.
+- v1 is a **performance** roofline; the deeper version is per-area / per-energy
+  (perf/area/watt — the decision architects actually make). Keep v1 simple.
+- Prior-art pass still owed before committing: cache-aware roofline (CARM),
+  gem5-Aladdin, Timeloop/Accelergy, and any existing "ISA-extension vs
+  accelerator" comparisons. Find exactly where this plants ground no one holds.
+See [[mouna-project]] (the validated model that supplies the custom-insn line).
